@@ -2,6 +2,8 @@
 
 A reusable robot motion planning library for the [dora-rs](https://github.com/dora-rs/dora) dataflow framework. Provides MoveIt-style IK solving, collision-aware OMPL planning, trajectory execution, and a high-level MoveGroup API — for any robot arm.
 
+![Hunter SE + GEN72 Arm in MuJoCo](images/hunter_arm.png)
+
 ## Features
 
 - **MoveGroup API** — High-level interface similar to ROS MoveIt's MoveGroupCommander
@@ -116,6 +118,99 @@ Set the env var in your dataflow YAML:
 ```
 
 See [`dora_moveit/dora_moveit/config.py`](dora_moveit/dora_moveit/config.py) for the full `RobotConfig` protocol and [`examples/`](examples/) for a complete working example.
+
+## Deployment Guide — MuJoCo Demos
+
+### Prerequisites
+
+- Python 3.9+
+- [dora-rs](https://github.com/dora-rs/dora) CLI installed (`cargo install dora-cli` or download a release binary)
+- A display server (X11/Wayland) for the MuJoCo viewer
+
+### 1. MoveGroup Demo (GEN72 Standalone Arm)
+
+The simplest starting point — a single GEN72 7-DOF arm demonstrating all 5 MoveGroup features: named poses, joint goals, Cartesian pose goals, Cartesian paths, and collision objects.
+
+```bash
+# 1. Install packages
+pip install -e dora_moveit/
+pip install -e dora-mujoco/
+pip install -e examples/move_group_demo/
+
+# 2. Launch
+cd examples/move_group_demo
+dora up
+dora start dataflows/moveit_example_mujoco.yml
+
+# 3. Stop when done
+dora stop
+```
+
+**Dataflow nodes:** `mujoco_sim` → `planning_scene` → `planner` → `ik_solver` → `trajectory_executor` → `user_node`
+
+The `user_node` runs through all 5 demos automatically and then idles. The MuJoCo viewer window shows the arm moving in real time.
+
+**Troubleshooting:**
+- If nodes fail with `ModuleNotFoundError`, ensure all three packages are installed in the same Python environment that dora uses. You can set `PYTHONPATH` in each node's `env:` block in the dataflow YAML to point to your site-packages directory.
+- If you see `version mismatch: message format vX is not compatible with vY`, make sure the `dora-rs` Python package version matches your `dora` CLI version (`dora --version`).
+
+### 2. Hunter with ARM Demo (Mobile Robot + Arm)
+
+Hunter SE mobile platform with a GEN72 arm mounted on top, operating in an industrial pipe inspection scene.
+
+```bash
+# 1. Install packages
+pip install -e dora_moveit/
+pip install -e dora-mujoco/
+pip install -e examples/hunter_with_arm/
+
+# 2. Launch MoveGroup API demo
+cd examples/hunter_with_arm
+dora up
+dora start dataflows/movegroup_mujoco.yml
+
+# 3. Stop when done
+dora stop
+```
+
+**Available dataflows:**
+
+| Dataflow | Description |
+|----------|-------------|
+| `movegroup_mujoco.yml` | MoveGroup API demo — arm moves through named poses, joint goals, and planned trajectories |
+| `hunter_arm_mujoco.yml` | Choreographed multi-view capture — arm sequences through inspection positions |
+| `gen72_mujoco.yml` | Standalone GEN72 arm simulation (no Hunter SE vehicle) |
+| `gen72_real.yml` | Physical GEN72 arm via Realman SDK (requires hardware) |
+
+**Dataflow nodes (movegroup):** `mujoco_sim` → `planning_scene` → `planner` → `ik_solver` → `trajectory_executor` → `vehicle_controller` → `user_node`
+
+The demo automatically:
+1. Moves the arm to home position
+2. Turns the arm right
+3. Arches over a pipe (capture position)
+4. Returns to home
+5. Executes a planned trajectory
+6. Idles when complete
+
+**Troubleshooting:**
+- Verify the `MODEL_NAME` path in the dataflow YAML points to the correct `.xml` file under `examples/hunter_with_arm/models/`.
+- The Hunter SE model (`hunter_se_with_arm_and_pipes.xml`) includes the vehicle, arm, and industrial pipe scene. If you only want the arm, use `gen72_mujoco.yml` instead.
+
+### Environment Variable Setup (Alternative to pip install)
+
+If you prefer not to use pip editable installs, set `PYTHONPATH` directly:
+
+```bash
+export PYTHONPATH=/path/to/dora_moveit:/path/to/dora-mujoco:/path/to/examples/hunter_with_arm:$PYTHONPATH
+```
+
+Or add `PYTHONPATH` to each node's `env:` block in the dataflow YAML:
+
+```yaml
+env:
+  ROBOT_CONFIG_MODULE: "hunter_arm_demo.config.gen72"
+  PYTHONPATH: "/path/to/your/site-packages"
+```
 
 ## Adding a New Robot
 
